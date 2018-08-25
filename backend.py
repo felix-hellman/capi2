@@ -3,6 +3,7 @@ from time import time
 from time import sleep
 from threading import Thread
 import json
+import FluidPool
 
 if "debug" in argv[1]:
 	from mockzero import LED
@@ -11,6 +12,29 @@ elif "deploy" in argv[1]:
 else:
 	print("No mode selected, quitting... ")
 	exit(1)
+
+class FluidPool:
+	queue = []
+	def __init__(self):
+		pass
+	def openFor(self,index,seconds):
+		self.queue.append(flowForSeconds(index,seconds))
+	def openIngredientFor(self,ingredient,seconds):
+		self.queue.append(flowForSeconds(fetchLiquidIndex(ingredient),seconds))
+	def openIngredient(self,drinkIngredient):
+		self.queue.append(flowForSeconds(fetchLiquidIndex(drinkIngredient.name),drinkIngredient.cl))
+	def waitForRemaining(self):
+		for t in self.queue:
+			t.join()
+	def isAvailable(self):
+		for t in self.queue:
+			if t.isAlive():
+				return False
+		return True
+	def __del__(self):
+		self.waitForRemaining()
+
+fluidPool = FluidPool()
 
 def timeable(func):
 	def wrapper(*args, **kwargs):
@@ -26,26 +50,21 @@ def threadable(func):
 		return thread
 	return wrapper
 
+def blocking(func):
+	def wrapper(*args,**kwargs):
+		global fluidPool
+		if fluidPool.isAvailable():
+			func(*args,**kwargs)
+		else:
+			print("Currently busy, skipping job!")
+	return wrapper
+
 @threadable
 @timeable
 def flowForSeconds(index,seconds):
 	LED(index).on()
 	sleep(seconds)
 	LED(index).off()
-
-class FluidPool:
-	queue = []
-	def __init__(self):
-		pass
-	def openFor(self,index,seconds):
-		self.queue.append(flowForSeconds(index,seconds))
-	def openIngredientFor(self,ingredient,seconds):
-		self.queue.append(flowForSeconds(fetchLiquidIndex(ingredient),seconds))
-	def openIngredient(self,drinkIngredient):
-		self.queue.append(flowForSeconds(fetchLiquidIndex(drinkIngredient.name),drinkIngredient.cl))
-	def waitForRemaining(self):
-		for t in self.queue:
-			t.join()
 
 def fetchLiquidIndex(ingredient):
 	with open("liquidIndex.json") as f:
@@ -55,6 +74,26 @@ def fetchLiquidIndex(ingredient):
 				return result[key]
 	return -1
 
+def parseRecipe(recipe):
+	print(recipe)
+	result = json.loads(recipe)
+	ingredientList = []
+	for ingredient in result["ingredients"]:
+		ingredientList.append(DrinkIngredient(ingredient["name"],ingredient["amount"]))
+	return ingredientList
+
+
+def rumAndCokeJson():
+	with open("recipe.json") as f:
+		result = json.load(f)
+		return json.dumps(result[0])
+
+@blocking
+def pourDrinkFromJson(jsonRecipe):
+	recipe = parseRecipe(jsonRecipe)
+	for ingredient in recipe:
+		fluidPool.openIngredient(ingredient)
+
 class DrinkIngredient:
 	name = ""
 	cl = -1
@@ -62,10 +101,7 @@ class DrinkIngredient:
 		self.name = name
 		self.cl = cl
 
-vodka = DrinkIngredient("Vodka",10)
-water = DrinkIngredient("Water",5)
-
-fp = FluidPool()
-fp.openIngredient(vodka)
-fp.openIngredient(water)
-fp.waitForRemaining()
+pourDrinkFromJson(rumAndCokeJson())
+pourDrinkFromJson(rumAndCokeJson())
+pourDrinkFromJson(rumAndCokeJson())
+pourDrinkFromJson(rumAndCokeJson())
