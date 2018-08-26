@@ -2,8 +2,9 @@ from sys import argv
 from time import time
 from time import sleep
 from threading import Thread
+from flask import Flask
+from flask_restful import Resource, Api, request
 import json
-import FluidPool
 
 if "debug" in argv[1]:
 	from mockzero import LED
@@ -88,6 +89,10 @@ def rumAndCokeJson():
 		result = json.load(f)
 		return json.dumps(result[0])
 
+def getAllRecipe():
+	with open("recipe.json") as f:
+		return json.load(f)
+
 @blocking
 def pourDrinkFromJson(jsonRecipe):
 	recipe = parseRecipe(jsonRecipe)
@@ -101,7 +106,16 @@ class DrinkIngredient:
 		self.name = name
 		self.cl = cl
 
-pourDrinkFromJson(rumAndCokeJson())
-pourDrinkFromJson(rumAndCokeJson())
-pourDrinkFromJson(rumAndCokeJson())
-pourDrinkFromJson(rumAndCokeJson())
+class CocktailApi(Resource):
+	def get(self):
+		return getAllRecipe()
+	def post(self):
+		pourDrinkFromJson(request.data)
+	
+app = Flask(__name__)
+api = Api(app)
+api.add_resource(CocktailApi,"/cocktail")
+
+if __name__ == '__main__':
+	app.run(debug = True)
+
