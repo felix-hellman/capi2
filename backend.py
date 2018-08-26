@@ -111,10 +111,18 @@ class CocktailApi(Resource):
 		return getAllRecipe()
 	def post(self):
 		pourDrinkFromJson(request.data)
-	
+
+class Status(Resource):
+	def get(self):
+		global fluidPool
+		result = {}
+		result["avilable"] = fluidPool.isAvailable()
+		return result
+
 app = Flask(__name__)
 api = Api(app)
 api.add_resource(CocktailApi,"/cocktail")
+api.add_resource(Status,"/status")
 
 if __name__ == '__main__':
 	app.run(debug = True)
